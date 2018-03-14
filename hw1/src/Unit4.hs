@@ -1,0 +1,29 @@
+{-# LANGUAGE InstanceSigs #-}
+module Unit4 where
+
+--task1
+data Pair a = Pair a a
+data NonEmpty a = a :| [a]
+
+instance Foldable Pair where
+  foldMap :: Monoid m => (a -> m) -> Pair a -> m
+  foldMap f (Pair a b) = f a `mappend` f b
+
+  foldr :: (a -> b -> b) -> b -> Pair a -> b
+  foldr f z (Pair a b) = a `f` (b `f` z)
+
+instance Foldable NonEmpty where
+  foldMap :: Monoid m => (a -> m) -> NonEmpty a -> m
+  foldMap f (a:|as) = f a `mappend` foldMap f as
+
+  foldr :: (a -> b -> b) -> b -> NonEmpty a -> b
+  foldr f z (a:|as) = f a (foldr f z as)
+
+--task2
+splitOn :: (Foldable t, Eq a) => a -> t a -> [[a]]
+splitOn val list = foldr (add val) [[]] list
+  where
+    add :: Eq a => a -> a -> [[a]] -> [[a]]
+    add val curr ans@(n:ns)
+      | val == curr = []:ans
+      | otherwise = (curr:n):ns
