@@ -191,10 +191,11 @@ remove (Node values l r) x
   | otherwise  = delMid l --Want to delete Node
     where
       delMid Leaf = r
-      delMid l =
-        let maxLVals = findMax l in
-        Node maxLVals (remove l (head maxLVals)) r
+      delMid lCh =
+        let maxLVals = findMax lCh in
+        Node maxLVals (remove lCh (head maxLVals)) r
           where
           findMax :: (Ord a) => DPTree a -> [a]
-          findMax (Node vals _ Leaf) = vals
-          findMax (Node _ _ r) = findMax r
+          findMax (Node vs _ Leaf) = vs
+          findMax (Node _ _ rCh) = findMax rCh
+          findMax _ = error "imposible search occurred"

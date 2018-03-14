@@ -24,6 +24,6 @@ splitOn :: (Foldable t, Eq a) => a -> t a -> [[a]]
 splitOn val list = foldr (add val) [[]] list
   where
     add :: Eq a => a -> a -> [[a]] -> [[a]]
-    add val curr ans@(n:ns)
-      | val == curr = []:ans
-      | otherwise = (curr:n):ns
+    add value curr ans
+      | value == curr = []:ans
+      | otherwise = (curr:(head ans)):(drop 1 ans)
