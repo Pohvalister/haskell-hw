@@ -1,6 +1,7 @@
 {-# LANGUAGE InstanceSigs #-}
 module Unit5 where
 import Data.Semigroup
+import Unit4 (NonEmpty((:|)))
 
 --task1
 maybeConcat :: [Maybe [a]] -> [a]
@@ -10,7 +11,7 @@ maybeConcat = foldr connect [] --mays Eta-reduce
     connect (Just vals) z = vals ++ z
 
 --task2
-data NonEmpty  a = a :| [a]
+--data NonEmpty  a = a :| [a]
 
 instance Semigroup (NonEmpty a) where
   (<>) :: NonEmpty a -> NonEmpty a -> NonEmpty a
@@ -47,12 +48,7 @@ instance Monoid Builder where
   mempty = Many []
 
   mappend :: Builder -> Builder -> Builder
-  mappend (One a) (Many []) = One a
-  mappend (Many []) (One b) = One b
-  mappend (One a) (One b) = Many [One a, One b]
-  mappend (One a) (Many bs) = Many (One a : bs)
-  mappend (Many as) (One b) = Many (as ++ [One b])
-  mappend (Many as) (Many bs) = Many (as ++ bs)
+  mappend = (<>)
 
 fromString :: String -> Builder
 fromString "" = Many []

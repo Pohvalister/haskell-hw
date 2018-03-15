@@ -3,24 +3,22 @@ module Unit3 where
 
 --task1
 data WeekDays = Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday
+    deriving (Enum, Bounded)
 
-nextDay:: WeekDays -> WeekDays
-nextDay Monday = Tuesday
-nextDay Tuesday = Wednesday
-nextDay Wednesday = Thursday
-nextDay Thursday = Friday
-nextDay Friday = Saturday
-nextDay Saturday = Sunday
-nextDay Sunday = Monday
+--nextDay:: WeekDays -> WeekDays
+--nextDay Monday = Tuesday
+--nextDay Tuesday = Wednesday
+--nextDay Wednesday = Thursday
+--nextDay Thursday = Friday
+--nextDay Friday = Saturday
+--nextDay Saturday = Sunday
+--nextDay Sunday = Monday
 
-afterDay:: WeekDays -> WeekDays
-afterDay Monday = Sunday
-afterDay Tuesday = Monday
-afterDay Wednesday = Tuesday
-afterDay Thursday = Wednesday
-afterDay Friday = Thursday
-afterDay Saturday = Friday
-afterDay Sunday = Saturday
+afterDays:: Int -> WeekDays -> WeekDays
+afterDays count day = toEnum $ rem (fromEnum day + count)  (fromEnum (maxBound::WeekDays) + 1)
+
+nextDay :: WeekDays -> WeekDays
+nextDay = afterDays 6
 
 isWeekend:: WeekDays -> Bool
 isWeekend Saturday = True
@@ -95,7 +93,7 @@ buildWalls walls city = searchCastle (defence city)
         searchRuler Nothing = Left "city has no lord"
         searchRuler _ =
           let (one,other) = abode city
-          in if ((countPeople one) + (sum $ map countPeople other)) < 10
+          in if (countPeople one) + (sum $ map countPeople other) < 10
              then Left "not enougth workers"
              else Right city {defence = Just (castle {fortifications = Just walls})}
 
@@ -179,6 +177,11 @@ insert (Node values l r) x
 fromList :: (Ord a) => [a] -> DPTree a
 fromList [] = Leaf
 fromList (x:xs) = insert (fromList xs) x
+
+toList :: (Ord a) => DPTree a -> [a]
+toList Leaf = []
+toList (Node values l r) = toList l ++ values ++ toList r
+
 
 remove :: (Ord a) => DPTree a -> a -> DPTree a
 remove Leaf _ = Leaf
