@@ -29,8 +29,7 @@ isWeekend _ = False
 
 daysToParty:: WeekDays -> Int
 daysToParty Friday = 0
-daysToParty day = (daysToParty (nextDay day)) + 1
-
+daysToParty day = daysToParty (nextDay day) + 1
 
 --task2
 newtype Person = Person String
@@ -50,7 +49,7 @@ countPeople :: House -> Int
 countPeople house = countInFamily (family house)
   where
     countInFamily :: (Person, Maybe Person, Maybe Person, Maybe Person) -> Int
-    countInFamily (_,b,c,d) = 1 + (exist b) + (exist c) + (exist d)
+    countInFamily (_,b,c,d) = 1 + exist b + exist c + exist d
       where
         exist Nothing = 0
         exist _ = 1
@@ -76,7 +75,7 @@ buildNurture n city = searchNurture (influence city)
     searchNurture _ = (False, city)
 
 buildHouse :: (Person, Maybe Person, Maybe Person, Maybe Person) -> City -> City
-buildHouse fam city = city {abode = (fst (abode city), House {family = fam}:(snd (abode city)) )}
+buildHouse fam city = city {abode = (fst (abode city), House {family = fam}:snd (abode city) )}
 
 enterLord :: Person -> City -> Either String City
 enterLord lord city = enterDefences (defence city)
@@ -97,8 +96,8 @@ buildWalls walls city = searchCastle (defence city)
         searchRuler _ =
           let (one,other) = abode city
           in if ((countPeople one) + (sum $ map countPeople other)) < 10
-                          then Left "not enougth workers"
-                          else Right city {defence = Just (castle {fortifications = Just walls})}
+             then Left "not enougth workers"
+             else Right city {defence = Just (castle {fortifications = Just walls})}
 
 
 --task3
@@ -127,7 +126,7 @@ instance Num Nat where
 
   (-) :: Nat -> Nat -> Nat
   (-) a Z = a
-  (-) a b = (dec a) - (dec b)
+  (-) a b = dec a - dec b
     where
       dec Z = Z
       dec (S x) = x
@@ -140,20 +139,19 @@ instance Num Nat where
 
   fromInteger :: Integer -> Nat
   fromInteger z
-    |z > 0 = S (fromInteger (z-1))
-    |otherwise =  Z
-
+      |z > 0 = S (fromInteger (z-1))
+      |otherwise =  Z
 
 ntoInteger :: Nat -> Int
 ntoInteger Z = 0
-ntoInteger (S n) = (ntoInteger n) + 1
+ntoInteger (S n) = ntoInteger n + 1
 
 
 --task4
 data DPTree t = Leaf |  Node
                       { vals    :: [t]
-                      , leftCh  :: (DPTree t)
-                      , rightCh :: (DPTree t)
+                      , leftCh  :: DPTree t
+                      , rightCh :: DPTree t
                       }
 
 isEmpty :: DPTree t -> Bool
@@ -162,21 +160,21 @@ isEmpty _ = True
 
 sizeOf :: DPTree t -> Int
 sizeOf Leaf = 0
-sizeOf (Node _ l r) = (sizeOf l) + (sizeOf r) + 1
+sizeOf (Node _ l r) = sizeOf l + sizeOf r + 1
 
 find :: (Ord a) => DPTree a -> a -> Bool
 find Leaf _ = False
 find (Node values l r) x
-  | x == (head values) = True
-  | x < (head values) = find l x
-  | otherwise = find r x
+    | x == head values = True
+    | x < head values = find l x
+    | otherwise = find r x
 
 insert :: (Ord a) => DPTree a -> a -> DPTree a
 insert Leaf x = Node [x] Leaf Leaf
 insert (Node values l r) x
-  | x == (head values) = Node (x:values) l r
-  | x < (head values) = Node values (insert l x) r
-  | otherwise = Node values l (insert r x)
+    | x == head values = Node (x:values) l r
+    | x < head values = Node values (insert l x) r
+    | otherwise = Node values l (insert r x)
 
 fromList :: (Ord a) => [a] -> DPTree a
 fromList [] = Leaf
@@ -185,17 +183,17 @@ fromList (x:xs) = insert (fromList xs) x
 remove :: (Ord a) => DPTree a -> a -> DPTree a
 remove Leaf _ = Leaf
 remove (Node values l r) x
-  | x > (head values)= Node values l (remove r x)
-  | x < (head values) = Node values (remove l x) r
-  | x == (head values) && (drop 1 values) /= [] = Node (drop 1 values) l r
-  | otherwise  = delMid l --Want to delete Node
-    where
-      delMid Leaf = r
-      delMid lCh =
-        let maxLVals = findMax lCh in
-        Node maxLVals (remove lCh (head maxLVals)) r
+    | x > head values= Node values l (remove r x)
+    | x < head values = Node values (remove l x) r
+    | x == head values && drop 1 values /= [] = Node (drop 1 values) l r
+    | otherwise  = delMid l --Want to delete Node
+  where
+    delMid Leaf = r
+    delMid lCh =
+        let maxLVals = findMax lCh
+        in Node maxLVals (remove lCh (head maxLVals)) r
           where
-          findMax :: (Ord a) => DPTree a -> [a]
-          findMax (Node vs _ Leaf) = vs
-          findMax (Node _ _ rCh) = findMax rCh
-          findMax _ = error "imposible search occurred"
+            findMax :: (Ord a) => DPTree a -> [a]
+            findMax (Node vs _ Leaf) = vs
+            findMax (Node _ _ rCh) = findMax rCh
+            findMax _ = error "imposible search occurred"

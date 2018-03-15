@@ -21,9 +21,9 @@ instance Foldable NonEmpty where
 
 --task2
 splitOn :: (Foldable t, Eq a) => a -> t a -> [[a]]
-splitOn val list = foldr (add val) [[]] list
+splitOn val = foldr (add val) [[]] --list Eta-reduce
   where
     add :: Eq a => a -> a -> [[a]] -> [[a]]
     add value curr ans
-      | value == curr = []:ans
-      | otherwise = (curr:(head ans)):(drop 1 ans)
+        | value == curr = []:ans
+        | otherwise = (curr:head ans):drop 1 ans
