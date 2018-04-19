@@ -100,3 +100,5 @@ int =  ((\x -> (-1)*x) <$> (element '-' *> getInt)) <|> (element '+' *> getInt) 
   where
     getInt :: Parser Char Integer
     getInt = read <$> some (satisfy isDigit)
+
+--task4
