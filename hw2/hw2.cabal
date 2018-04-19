@@ -48,7 +48,7 @@ cabal-version:       >=1.10
 
 library
   -- Modules exported by the library.
-  exposed-modules: Unit1 Unit2 Unit3 TestUnit1 TestUnit2
+  exposed-modules: Unit1 Unit2 Unit3 TestUnit1 TestUnit2 TestUnit3
   ghc-options: -Wall
 
 
