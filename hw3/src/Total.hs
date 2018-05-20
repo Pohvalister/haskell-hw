@@ -19,9 +19,12 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 --------U3
 import Control.Monad.State.Lazy
+
 --------U6
 import System.IO
 
+-------U8
+import Control.Monad.Cont
 
 --------U10
 import System.Environment
@@ -107,7 +110,7 @@ rword :: String -> Parser ()
 rword w = (lexeme . try) (string w *> notFollowedBy alphaNumChar)
 
 reservedW :: [String]
-reservedW = ["let", "in", "=", "mut", ";"]
+reservedW = ["let", "in", "=", "mut", ";", "for", "break"]
 
 name :: Parser String
 name = (lexeme . try) (p >>= check)
@@ -155,13 +158,13 @@ data EnvironmetException = NoVariableInEnv String | VariableAlreadyExists String
   deriving (Show)
 instance Exception EnvironmetException
 
-updV :: String -> Integer -> StateT (Map.Map String Integer) IO ()
+updV :: (MonadIO m) => String -> Integer -> StateT (Map.Map String Integer) m ()
 updV key val = gets (Map.member key) >>= (\found -> if found
                                                     then modify (Map.insert key val)
                                                     else throw (NoVariableInEnv key)
                                           )
 
-defV :: String -> Integer -> StateT (Map.Map String Integer) IO ()
+defV :: (MonadIO m) => String -> Integer -> StateT (Map.Map String Integer) m ()
 defV key val = gets (Map.member key) >>= (\found -> if (not found)
                                                     then modify (Map.insert key val)
                                                     else throw (VariableAlreadyExists key)
@@ -199,15 +202,15 @@ updvParser = do
   expr <- exprParser
   return (Upd var expr)
 
-------------Unit5 + Unit6 + Unit7
+------------Unit5 + Unit6 + Unit7 + Unit8 + Unit9
 
-evalStmt :: [Stmt] -> StateT (Map.Map String Integer) IO ()
+evalStmt :: (MonadIO m) => [Stmt] -> (StateT (Map.Map String Integer) m) ()
 evalStmt stmts = foldl evalStmtAndAdd (return ()) stmts
   where
-    evalStmtAndAdd :: StateT (Map.Map String Integer) IO () -> Stmt -> StateT (Map.Map String Integer) IO ()
+    evalStmtAndAdd :: (MonadIO m) => (StateT (Map.Map String Integer) m ()) -> Stmt -> (StateT (Map.Map String Integer) m ())
     evalStmtAndAdd mapStat stmtVal = mapStat >>= (updFun stmtVal)
       where
-        updFun :: Stmt -> () -> StateT (Map.Map String Integer) IO ()
+        updFun :: (MonadIO m) => Stmt -> () ->  StateT (Map.Map String Integer) m ()
         updFun stmt _ = case stmt of
           Def var expr -> do
             env <- get
@@ -219,12 +222,31 @@ evalStmt stmts = foldl evalStmtAndAdd (return ()) stmts
             return ()
           Wrt expr -> do
             env <- get
-            (lift . putStrLn) (show (evalExpr env expr))
+            (liftIO . putStrLn) (show (evalExpr env expr))
             return ()
           RdV var -> do
-            str <- (lift getLine)
+            str <- (liftIO getLine)
             defV var (read str)
             return ()
+          For var begExpr endExpr lst -> do
+            env <- get
+            defV var (evalExpr env begExpr)
+            let bodyEval = evalStmt lst
+            let recursive = do
+                  env1 <- get
+                  let second = (evalExpr env1 endExpr)
+                  curVal <- gets (Map.! var)
+                  if (curVal >= second)
+                    then return ()
+                    else do --bodyEval >>= gets (Map.! var) >>= \val -> updV var (val + 1) >> recursive
+                        bodyEval
+                        val <- gets (Map.! var)
+                        updV var (val + 1)
+                        recursive
+            _ <- recursive
+            delV var
+            return ()
+          Brk -> return ()
 
 ------------Unit6
 
@@ -242,7 +264,7 @@ readParser = do
   var <- name
   return (RdV var)
 
------------Unit8
+------------Unit8
 
 loopParser :: Parser Stmt
 loopParser = do
@@ -250,10 +272,26 @@ loopParser = do
   Def var begExpr <- defvParser
   semicolon
   endExpr <- exprParser
+  rword "{"
   body <- many stmtParser
+  rword "}"
   return (For var begExpr endExpr body)
 
+delV :: (MonadIO m) => String -> StateT (Map.Map String Integer) m ()
+delV key = gets (Map.member key) >>= (\found -> if found
+                                                then modify (Map.delete key)
+                                                else throw (NoVariableInEnv key)
+                                      )
+
+------------Unit9
+
+brekParser :: Parser Stmt
+brekParser = do
+  rword "break"
+  return Brk
+
 ------------Unit10
+
 newtype Code = Code [Stmt]
   deriving (Show)
 
