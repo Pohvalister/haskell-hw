@@ -6,6 +6,7 @@ import Control.Exception (throw, Exception(..))
 import Control.Monad.Reader
 import Control.Monad (liftM2)
 import Data.List (find)
+import Data.Maybe (fromMaybe)
 
 import qualified Data.Map.Strict as Map
 
@@ -23,7 +24,7 @@ import Control.Monad.State.Lazy
 --------U6
 import System.IO
 
--------U8
+--------U8
 import Control.Monad.Cont
 
 --------U10
@@ -39,30 +40,7 @@ data EvalException = DivisionByZero | DoesntExist String | UnknownError
 instance Exception EvalException
 
 
--- evalExpr :: [(String, Integer)] -> Expr -> Maybe Integer
--- evalExpr mp expr = runReader (evalRead expr) mp
---   where
---     evalRead :: Expr -> Reader [(String, Integer)] (Maybe Integer)
---     evalRead expr = case expr of
---       Lit val -> return $ return val
---       Var var -> asks (getValue var)
---         where
---           getValue:: String -> [(String,Integer)] -> Maybe Integer
---           getValue str lst = (find (\(a,_)-> a == str) lst) >>= (\(_,b) -> return b)
---       Add e1 e2 -> liftM2 (liftM2 (+)) (evalRead e1) (evalRead e2)
---       Sub e1 e2 -> liftM2 (liftM2 (-)) (evalRead e1) (evalRead e2)
---       Mul e1 e2 -> liftM2 (liftM2 (*)) (evalRead e1) (evalRead e2)
---       Div e1 e2 -> liftM2 (\a b -> (>>=) a divExp <*> b) (evalRead e1) (evalRead e2)
---         where
---           divExp :: Integer -> Maybe (Integer -> Integer)
---           divExp dExp =  if dExp==0
---             then Nothing
---             else return (div `flip` dExp)
---       Let var eIn eOut -> (evalRead eIn) >>= (\val -> case val of
---                                                         Nothing -> return Nothing
---                                                         Just valIn -> local ((:) (var,valIn)) (evalRead eOut))
-
-evalExpr :: (Map.Map String Integer) -> Expr -> Integer
+evalExpr :: Map.Map String Integer -> Expr -> Integer
 evalExpr mp expr = runReader (evalRead expr) mp
   where
     evalRead :: Expr -> Reader (Map.Map String Integer) Integer
@@ -70,27 +48,24 @@ evalExpr mp expr = runReader (evalRead expr) mp
       Lit val -> return val
       Var var -> asks (getValue var)
         where
-          getValue:: String -> (Map.Map String Integer) -> Integer
-          getValue str lst = case Map.lookup str  lst of
-            Nothing -> throw (DoesntExist str)
-            Just x -> x
+          getValue:: String -> Map.Map String Integer -> Integer
+          getValue str lst = fromMaybe (throw (DoesntExist str)) (Map.lookup str lst)
       Add e1 e2 -> liftM2 (+) (evalRead e1) (evalRead e2)
       Sub e1 e2 -> liftM2 (-) (evalRead e1) (evalRead e2)
       Mul e1 e2 -> liftM2 (*) (evalRead e1) (evalRead e2)
-      Div e1 e2 -> liftM2 (divExp) (evalRead e1) (evalRead e2)
+      Div e1 e2 -> liftM2 divExp (evalRead e1) (evalRead e2)
         where
           divExp :: Integer -> Integer -> Integer
           divExp dived divisor =  if divisor == 0
             then throw DivisionByZero
             else dived `div` divisor
-      Let var eIn eOut -> (evalRead eIn) >>= (\val -> local (Map.insert var val)  (evalRead eOut))
+      Let var eIn eOut -> evalRead eIn >>= (\val -> local (Map.insert var val)  (evalRead eOut))
 
 ------------Unit2
 
 type Parser = Parsec Void String
+
 --useful parsers
--- sc :: Parser ()
--- sc = (try (many (satisfy (==' ')) *> return()) )
 sc :: Parser ()
 sc = L.space space1 (L.skipLineComment "//") (L.skipBlockComment "/*" "*/")
 
@@ -165,11 +140,13 @@ updV key val = gets (Map.member key) >>= (\found -> if found
                                           )
 
 defV :: (MonadIO m, MonadCont m) => String -> Integer -> StateT (Map.Map String Integer) m ()
-defV key val = gets (Map.member key) >>= (\found -> if (not found)
+defV key val = gets (Map.member key) >>= (\found -> if not found
                                                     then modify (Map.insert key val)
                                                     else throw (VariableAlreadyExists key)
                                           )
+
 -------------Unit4
+
 data Stmt = Def String Expr | Upd String Expr
           | Wrt Expr --U6
           | RdV String --U7
@@ -193,9 +170,7 @@ stmtParser = defvParser <* semicolon
 defvParser :: Parser Stmt
 defvParser = do
   rword "mut"
-  var <- name
-  rword "="
-  expr <- exprParser
+  Upd var expr <- updvParser
   return (Def var expr)
 
 updvParser :: Parser Stmt
@@ -208,12 +183,12 @@ updvParser = do
 ------------Unit5 + Unit6 + Unit7 + Unit8 + Unit9
 
 evalStmt :: (MonadIO m, MonadCont m) => [Stmt] -> StateT (Map.Map String Integer) m BreakInfo
-evalStmt stmts = callCC $ \exit -> (foldl (evalStmtAndAdd exit) (return NoBreak) stmts)
+evalStmt stmts = callCC $ \exit -> foldl (evalStmtAndAdd exit) (return NoBreak) stmts
   where
-    evalStmtAndAdd :: (MonadIO m, MonadCont m) => (BreakInfo -> StateT (Map.Map String Integer) m BreakInfo) -> (StateT (Map.Map String Integer) m BreakInfo) -> Stmt -> (StateT (Map.Map String Integer) m BreakInfo)
-    evalStmtAndAdd exit1 mapStat stmtVal = mapStat >>= (updFun exit1 stmtVal)
+    evalStmtAndAdd :: (MonadIO m, MonadCont m) => (BreakInfo -> StateT (Map.Map String Integer) m BreakInfo) -> StateT (Map.Map String Integer) m BreakInfo -> Stmt -> StateT (Map.Map String Integer) m BreakInfo
+    evalStmtAndAdd exit1 mapStat stmtVal = mapStat >>= updFun exit1 stmtVal
       where
-        updFun :: (MonadIO m, MonadCont m) =>(BreakInfo -> StateT (Map.Map String Integer) m BreakInfo) -> Stmt -> BreakInfo ->  StateT (Map.Map String Integer) m BreakInfo
+        updFun :: (MonadIO m, MonadCont m) => (BreakInfo -> StateT (Map.Map String Integer) m BreakInfo) -> Stmt -> BreakInfo ->  StateT (Map.Map String Integer) m BreakInfo
         updFun exit2 stmt _ = case stmt of
           Def var expr -> do
             env <- get
@@ -228,35 +203,28 @@ evalStmt stmts = callCC $ \exit -> (foldl (evalStmtAndAdd exit) (return NoBreak)
             (liftIO . putStrLn) (show (evalExpr env expr))
             return NoBreak
           RdV var -> do
-            str <- (liftIO getLine)
+            str <- liftIO getLine
             defV var (read str)
             return NoBreak
           For var begExpr endExpr lst -> do
             env <- get
             defV var (evalExpr env begExpr)
             let bodyEval = evalStmt lst
-            let recursive = do
-                  env1 <- get
-                  let second = (evalExpr env1 endExpr)
+            let recStep = do
+                  recEnv <- get
+                  let endVal = evalExpr recEnv endExpr
                   curVal <- gets (Map.! var)
-                  if (curVal >= second)
+                  if curVal >= endVal
                       then return NoBreak
-                      else do --bodyEval >>= gets (Map.! var) >>= \val -> updV var (val + 1) >> recursive
-                          a <- bodyEval
-                          case a of
+                      else do
+                          sign <- bodyEval
+                          case sign of
                             Break -> return NoBreak
-                            _ -> do
+                            NoBreak -> do
                               val <- gets (Map.! var)
                               updV var (val + 1)
-                              recursive
-                    --do --bodyEval >>= gets (Map.! var) >>= \val -> updV var (val + 1) >> recursive
-                      -- a <- bodyEval
-                      -- case a of
-                      --   -1 -> return 1
-                      --   otherwise -> val <- gets (Map.! var)
-                      --                updV var (val + 1)
-                      --                recursive
-            _ <- recursive
+                              recStep
+            _ <- recStep
             delV var
             return NoBreak
           Brk -> exit2 Break
@@ -298,6 +266,7 @@ delV key = gets (Map.member key) >>= (\found -> if found
                                       )
 
 ------------Unit9
+
 data BreakInfo = Break | NoBreak
 
 brekParser :: Parser Stmt
@@ -324,10 +293,10 @@ main = do
   fd <- openFile (head inputName) ReadMode
   content <- hGetContents fd
   let parsed = parse codeParser "" content
-  putStrLn $ show content
-  putStrLn $ show parsed
+  --print content
+  --print parsed
   case parsed of
-    Right (stmts) -> do
+    Right stmts -> do
       runContT (execStateT (evalStmt stmts) Map.empty) (const (return ()))
       return ()
     Left _ -> return ()

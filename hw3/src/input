@@ -19,6 +19,12 @@ for mut p = 1 + 1 to (let x = 4 in x) do
 	< p + 12;
 end
 < x;
+y = x - (x * x);
+< y;
+y = y - 1;
+< y;
+y = y+(1);
+mut t = x / y; 
 mut h = p +1;
 < x;
 < p;
