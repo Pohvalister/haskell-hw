@@ -110,7 +110,7 @@ rword :: String -> Parser ()
 rword w = (lexeme . try) (string w *> notFollowedBy alphaNumChar)
 
 reservedW :: [String]
-reservedW = ["let", "in", "=", "mut", ";", "for", "break"]
+reservedW = ["let", "in", "=", "mut", ";", "for", "to", "do", "end", "break", "continue"]
 
 name :: Parser String
 name = (lexeme . try) (p >>= check)
@@ -158,13 +158,13 @@ data EnvironmetException = NoVariableInEnv String | VariableAlreadyExists String
   deriving (Show)
 instance Exception EnvironmetException
 
-updV :: (MonadIO m) => String -> Integer -> StateT (Map.Map String Integer) m ()
+updV :: (MonadIO m, MonadCont m) => String -> Integer -> StateT (Map.Map String Integer) m ()
 updV key val = gets (Map.member key) >>= (\found -> if found
                                                     then modify (Map.insert key val)
                                                     else throw (NoVariableInEnv key)
                                           )
 
-defV :: (MonadIO m) => String -> Integer -> StateT (Map.Map String Integer) m ()
+defV :: (MonadIO m, MonadCont m) => String -> Integer -> StateT (Map.Map String Integer) m ()
 defV key val = gets (Map.member key) >>= (\found -> if (not found)
                                                     then modify (Map.insert key val)
                                                     else throw (VariableAlreadyExists key)
@@ -175,6 +175,7 @@ data Stmt = Def String Expr | Upd String Expr
           | RdV String --U7
           | For String Expr Expr [Stmt] --U8
           | Brk -- U9
+          | Cnt
   deriving (Show)
 
 semicolon :: Parser ()
@@ -185,7 +186,9 @@ stmtParser = defvParser <* semicolon
          <|> updvParser <* semicolon
          <|> writParser <* semicolon --U6
          <|> readParser <* semicolon --U7
-         <|> loopParser
+         <|> loopParser              --U8
+         <|> brekParser <* semicolon --U9
+         <|> contParser <* semicolon
 
 defvParser :: Parser Stmt
 defvParser = do
@@ -204,30 +207,30 @@ updvParser = do
 
 ------------Unit5 + Unit6 + Unit7 + Unit8 + Unit9
 
-evalStmt :: (MonadIO m) => [Stmt] -> (StateT (Map.Map String Integer) m) ()
-evalStmt stmts = foldl evalStmtAndAdd (return ()) stmts
+evalStmt :: (MonadIO m, MonadCont m) => [Stmt] -> StateT (Map.Map String Integer) m BreakInfo
+evalStmt stmts = callCC $ \exit -> (foldl (evalStmtAndAdd exit) (return NoBreak) stmts)
   where
-    evalStmtAndAdd :: (MonadIO m) => (StateT (Map.Map String Integer) m ()) -> Stmt -> (StateT (Map.Map String Integer) m ())
-    evalStmtAndAdd mapStat stmtVal = mapStat >>= (updFun stmtVal)
+    evalStmtAndAdd :: (MonadIO m, MonadCont m) => (BreakInfo -> StateT (Map.Map String Integer) m BreakInfo) -> (StateT (Map.Map String Integer) m BreakInfo) -> Stmt -> (StateT (Map.Map String Integer) m BreakInfo)
+    evalStmtAndAdd exit1 mapStat stmtVal = mapStat >>= (updFun exit1 stmtVal)
       where
-        updFun :: (MonadIO m) => Stmt -> () ->  StateT (Map.Map String Integer) m ()
-        updFun stmt _ = case stmt of
+        updFun :: (MonadIO m, MonadCont m) =>(BreakInfo -> StateT (Map.Map String Integer) m BreakInfo) -> Stmt -> BreakInfo ->  StateT (Map.Map String Integer) m BreakInfo
+        updFun exit2 stmt _ = case stmt of
           Def var expr -> do
             env <- get
             defV var (evalExpr env expr)
-            return ()
+            return NoBreak
           Upd var expr -> do
             env <- get
             updV var (evalExpr env expr)
-            return ()
+            return NoBreak
           Wrt expr -> do
             env <- get
             (liftIO . putStrLn) (show (evalExpr env expr))
-            return ()
+            return NoBreak
           RdV var -> do
             str <- (liftIO getLine)
             defV var (read str)
-            return ()
+            return NoBreak
           For var begExpr endExpr lst -> do
             env <- get
             defV var (evalExpr env begExpr)
@@ -237,16 +240,27 @@ evalStmt stmts = foldl evalStmtAndAdd (return ()) stmts
                   let second = (evalExpr env1 endExpr)
                   curVal <- gets (Map.! var)
                   if (curVal >= second)
-                    then return ()
-                    else do --bodyEval >>= gets (Map.! var) >>= \val -> updV var (val + 1) >> recursive
-                        bodyEval
-                        val <- gets (Map.! var)
-                        updV var (val + 1)
-                        recursive
+                      then return NoBreak
+                      else do --bodyEval >>= gets (Map.! var) >>= \val -> updV var (val + 1) >> recursive
+                          a <- bodyEval
+                          case a of
+                            Break -> return NoBreak
+                            _ -> do
+                              val <- gets (Map.! var)
+                              updV var (val + 1)
+                              recursive
+                    --do --bodyEval >>= gets (Map.! var) >>= \val -> updV var (val + 1) >> recursive
+                      -- a <- bodyEval
+                      -- case a of
+                      --   -1 -> return 1
+                      --   otherwise -> val <- gets (Map.! var)
+                      --                updV var (val + 1)
+                      --                recursive
             _ <- recursive
             delV var
-            return ()
-          Brk -> return ()
+            return NoBreak
+          Brk -> exit2 Break
+          Cnt -> exit2 NoBreak
 
 ------------Unit6
 
@@ -270,25 +284,31 @@ loopParser :: Parser Stmt
 loopParser = do
   rword "for"
   Def var begExpr <- defvParser
-  semicolon
+  rword "to"
   endExpr <- exprParser
-  rword "{"
+  rword "do"
   body <- many stmtParser
-  rword "}"
+  rword "end"
   return (For var begExpr endExpr body)
 
-delV :: (MonadIO m) => String -> StateT (Map.Map String Integer) m ()
+delV :: (MonadIO m, MonadCont m) => String -> StateT (Map.Map String Integer) m ()
 delV key = gets (Map.member key) >>= (\found -> if found
                                                 then modify (Map.delete key)
                                                 else throw (NoVariableInEnv key)
                                       )
 
 ------------Unit9
+data BreakInfo = Break | NoBreak
 
 brekParser :: Parser Stmt
 brekParser = do
   rword "break"
   return Brk
+
+contParser :: Parser Stmt
+contParser = do
+  rword "continue"
+  return Cnt
 
 ------------Unit10
 
@@ -307,5 +327,7 @@ main = do
   putStrLn $ show content
   putStrLn $ show parsed
   case parsed of
-    Right (stmts) -> const () <$> runStateT (evalStmt stmts) Map.empty
+    Right (stmts) -> do
+      runContT (execStateT (evalStmt stmts) Map.empty) (const (return ()))
+      return ()
     Left _ -> return ()
