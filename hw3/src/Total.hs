@@ -76,7 +76,7 @@ symbol :: String -> Parser String
 symbol = L.symbol sc
 
 integer :: Parser Integer
-integer = lexeme L.decimal
+integer = (lexeme . try) L.decimal
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
@@ -103,20 +103,19 @@ exprParser :: Parser Expr
 exprParser = makeExprParser term arithOperators
 
 term :: Parser Expr
-term = letTerm
-   <|> Lit <$> integer
+term = Lit <$> integer
+   <|> try (parens letTerm)
    <|> parens exprParser
    <|> Var <$> name
 
 letTerm :: Parser Expr
 letTerm  = do
-  rword "(let"
+  rword "let"
   nameVal <- name
   rword "="
   value <- exprParser
   rword "in"
   exprVal <- exprParser
-  rword ")"
   return (nameVal `Let` value $ exprVal)
 
 arithOperators :: [[Operator Parser Expr]]
@@ -281,9 +280,6 @@ contParser = do
 
 ------------Unit10
 
-newtype Code = Code [Stmt]
-  deriving (Show)
-
 codeParser :: Parser [Stmt]
 codeParser = between sc eof (many stmtParser)
 
@@ -299,4 +295,6 @@ main = do
     Right stmts -> do
       runContT (execStateT (evalStmt stmts) Map.empty) (const (return ()))
       return ()
-    Left _ -> return ()
+    Left err -> do
+      putStr (parseErrorPretty err)
+      return ()

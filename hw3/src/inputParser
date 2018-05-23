@@ -1,0 +1,28 @@
+		mut  x
+= 3+3  ;
+< x;
+x= 1;
+<  x;
+x = 2 ;
+<   x  ;
+
+
+mut asd0dsa = 1;
+
+for mut                   y =   
+
+1 / 2 * (8  ) to 
+			10 do asd0dsa = y;
+y = ( (  ((((asd0dsa)))))) ;
+< y; < (10 + asd0dsa); end for mut y = 1- 1 to 0+0 do break         ; continue ; end
+
+x = ( let x    =     x 
+in x);
+<                                              x;
+for mut e1 = 1 to 3 do for mut e2 = 1 to 3 do for mut e3 = 1 to 3 do
+	< (let q1 = e1 in (let q2 = e2 in (let q3 = e3 in (q1 + q2 + q3)))); 
+end end end
+
+mut y = 1 * 2 * 3 * 4 * 5 * 6 - 1 * 2 * 3 * 4 * 5 * 6 + 1 / 2 / 3 / 4 / 5 / 6;
+< y;
+
