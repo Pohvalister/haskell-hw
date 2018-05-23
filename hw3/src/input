@@ -18,6 +18,15 @@ for mut p = 1 + 1 to (let x = 4 in x) do
 	break;
 	< p + 12;
 end
+< 1000000;
+mut fibHelp = 1;
+mut fib = 1;
+> n;
+for mut i = 1 to n do 
+	fib = fib + fibHelp;
+	fibHelp = fib - fibHelp;
+end
+< fib;
 x = 1 -1;
 < x;
 y = x - (x * x);
