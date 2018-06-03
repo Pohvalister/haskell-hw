@@ -1,18 +1,27 @@
 {-# LANGUAGE RankNTypes #-}
---{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
---------TemplateHaskell--
+--------TemplateHaskell
 
 import Language.Haskell.TH
 
+import Shew
+--U1--
 chooseByIndices :: Int -> [Int] -> Q Exp
 chooseByIndices n lst = do let names = map (\x -> varE (mkName ("x_" ++ show x))) lst
                            lamE [tupP (map (\x -> varP (mkName ("x_" ++ show x))) [0..n-1])] (tupE names)
 
+--U2--
+data SomeData = SomeData { some :: String }
+deriveTextDef ''SomeData
 
+data ShowData = ShowData { show :: String }
+  deriving Show
+deriveText ''ShowData
 
---------lens
+--------Lens
+--U1--
 newtype Const a x = Const {getConst :: a}
 instance Functor (Const a) where
   fmap _ (Const v) = Const v
@@ -76,4 +85,15 @@ choosing l1 l2 fn from = case from of
 
 -- Изменить цель линзы, но вернуть старый результат.
 --(<<%~) :: Lens s t a b -> (a -> b) -> s -> (a, t)
---(<<%~) l f s = () s
+--(<<%~) l f s = ((l (\t -> (t, t))) (\fun (a, b) -> (a, f b) f) s
+
+--U2--
+
+data FS
+    = Dir
+          { name     :: FilePath  -- название папки, не полный путь
+          , contents :: [FS]
+          }
+    | File
+          { name     :: FilePath  -- название файла, не полный путь
+          }
