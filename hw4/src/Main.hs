@@ -10,6 +10,24 @@ hspecTestTree = testSpec "test" specTest
 
 specTest :: Spec
 specTest = do
+  describe "view tests" $ do
+    it "view 1 similar types" $
+      view _1 ("2", "3") `shouldBe` "2"
+    it "view 1 different types" $
+      view _1 ( 2 , "3") `shouldBe`  2
+    it "view 2 similar types" $
+      view _2 ( 2 ,  3 ) `shouldBe`  3
+    it "view 2 different types" $
+      view _2 ( 2 , "3") `shouldBe` "3"
+  describe "over tests" $ do
+    it "over 1 similar types" $
+      over _1 (++"1") ("2", "3") `shouldBe` ("21", "3")
+    it "over 1 different types" $
+      over _1 (+1   ) ( 2 , "3") `shouldBe` ( 3  , "3")
+    it "over 2 similar types" $
+      over _2 (+1   ) ( 2 ,  3 ) `shouldBe` ( 2 ,  4 )
+    it "over 2 different types" $
+      over _2 ("1"++) ( 2 , "3") `shouldBe` ( 2 , "13")
   describe "set tests" $ do
     it "set 1 similar types" $
       set _1 "1" ("2", "3") `shouldBe` ("1", "3")
