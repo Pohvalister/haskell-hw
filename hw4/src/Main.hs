@@ -8,6 +8,7 @@ import MainCode
 hspecTestTree :: IO TestTree
 hspecTestTree = testSpec "test" specTest
 
+-- to test HSPEC: runhaskell "this file"
 specTest :: Spec
 specTest = do
   describe "view tests" $ do
@@ -37,6 +38,19 @@ specTest = do
       set _2  1  ( 2 ,  3 ) `shouldBe` ( 2 ,  1 )
     it "set 2 different types" $
       set _2 "1" ( 2 , "3") `shouldBe` ( 2 , "1")
+  describe "check laws" $ do
+    it "you get back what you put in 1" $
+      view _1 (set _1 "1" ("2", "3")) `shouldBe` "1"
+    it "you get back what you put in 2" $
+      view _2 (set _2  1  ( 2 ,  3 )) `shouldBe`  1
+    it "putting back what you got doesn't change anything 1" $
+      set _1 (view _1 ("2", "3")) ("2", "3") `shouldBe` ("2", "3")
+    it "putting back what you got doesn't change anything 2" $
+      set _2 (view _2 ( 2 ,  3 )) ( 2 ,  3 ) `shouldBe` ( 2 ,  3 )
+    it "setting twice is the same as setting once 1" $
+      set _1 "1" (set _1 "0" ("2", "3")) `shouldBe`  ("1", "3")
+    it "setting twice is the same as setting once 2" $
+      set _2  1  (set _2  0  ( 2 ,  3 )) `shouldBe`  ( 2 ,  1 )
 
 
 main :: IO ()
